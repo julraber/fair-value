@@ -1,5 +1,6 @@
 const FMP_BASE_URL = "https://financialmodelingprep.com/stable";
 const CACHE_SECONDS = 6 * 60 * 60;
+const ACCESS_COOKIE = "fv_access";
 const FREE_STOCKS = [
   ["AAPL", "Apple Inc."], ["TSLA", "Tesla Inc."], ["AMZN", "Amazon.com Inc."],
   ["MSFT", "Microsoft Corporation"], ["NVDA", "NVIDIA Corporation"], ["GOOGL", "Alphabet Inc."],
@@ -52,6 +53,61 @@ function json(data, status = 200, extraHeaders = {}) {
       ...extraHeaders
     }
   });
+}
+
+function berlinDatePassword(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).formatToParts(date);
+  const value = type => parts.find(part => part.type === type)?.value || "";
+  return `${value("day")}${value("month")}${value("year")}`;
+}
+
+function readCookie(request, name) {
+  const cookieHeader = request.headers.get("Cookie") || "";
+  for (const part of cookieHeader.split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key === name) return value.join("=");
+  }
+  return "";
+}
+
+function base64Url(buffer) {
+  let binary = "";
+  for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function accessToken(datePassword, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(String(secret)),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(`fair-value:${datePassword}`));
+  return `${datePassword}.${base64Url(signature)}`;
+}
+
+function secureEqual(left, right) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index++) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+async function hasAccess(request, env) {
+  if (!env.FMP_API_KEY) return false;
+  const datePassword = berlinDatePassword();
+  const expected = await accessToken(datePassword, env.FMP_API_KEY);
+  return secureEqual(readCookie(request, ACCESS_COOKIE), expected);
 }
 
 function finite(value) {
@@ -354,6 +410,7 @@ function publicError(error) {
     PROVIDER_UNAVAILABLE: "Der Finanzdatenanbieter ist momentan nicht erreichbar.",
     INVALID_PROVIDER_RESPONSE: "Der Finanzdatenanbieter hat eine ungültige Antwort geliefert.",
     PROVIDER_ERROR: "Der Finanzdatenanbieter konnte die Anfrage nicht verarbeiten.",
+    PASSWORD_REQUIRED: "Für den automatischen Datenabruf ist ein gültiges Passwort erforderlich.",
     INTERNAL_ERROR: "Die Finanzdaten konnten momentan nicht geladen werden."
   };
   const invalidStage = code.startsWith("INVALID_PROVIDER_RESPONSE_")
@@ -372,8 +429,39 @@ export default {
     if (url.pathname === "/api/health") {
       return json({
         ok: true,
-        workerVersion: "7",
+        workerVersion: "8",
         fmpConfigured: Boolean(env.FMP_API_KEY)
+      });
+    }
+
+    if (url.pathname === "/api/session") {
+      if (request.method !== "GET") {
+        return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
+      }
+      return json({ ok: await hasAccess(request, env) });
+    }
+
+    if (url.pathname === "/api/login") {
+      if (request.method !== "POST") {
+        return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "POST" });
+      }
+      if (!env.FMP_API_KEY) {
+        return json({ ok: false, code: "API_KEY_MISSING", error: "Der Zugang kann noch nicht geprüft werden." }, 500);
+      }
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ ok: false, code: "INVALID_REQUEST" }, 400);
+      }
+      const password = String(body?.password || "").replace(/\D/g, "");
+      const today = berlinDatePassword();
+      if (!secureEqual(password, today)) {
+        return json({ ok: false, code: "INVALID_PASSWORD", error: "Das Passwort ist nicht korrekt." }, 401);
+      }
+      const token = await accessToken(today, env.FMP_API_KEY);
+      return json({ ok: true }, 200, {
+        "Set-Cookie": `${ACCESS_COOKIE}=${token}; Path=/; Max-Age=90000; HttpOnly; Secure; SameSite=Strict`
       });
     }
 
@@ -402,6 +490,13 @@ export default {
     if (url.pathname === "/api/stock") {
       if (request.method !== "GET") {
         return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
+      }
+      if (!(await hasAccess(request, env))) {
+        return json({
+          ok: false,
+          code: "PASSWORD_REQUIRED",
+          error: "Bitte zuerst das aktuelle Passwort eingeben."
+        }, 401);
       }
       if (!env.FMP_API_KEY) {
         return json({

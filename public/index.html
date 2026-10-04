@@ -24,6 +24,14 @@
         radial-gradient(circle at 15% 0%,rgba(143,41,71,.24),transparent 30rem),
         radial-gradient(circle at 90% 10%,rgba(116,27,55,.13),transparent 28rem),var(--bg)
     }
+    body.gate-active{overflow:hidden}
+    body.gate-active main{filter:blur(7px);opacity:.38;pointer-events:none;user-select:none}
+    .accessGate{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:20px;background:rgba(8,5,6,.76);backdrop-filter:blur(10px)}
+    .accessGate[hidden]{display:none}
+    .gateCard{width:min(100%,420px);padding:26px;border:1px solid #65434c;border-radius:22px;background:linear-gradient(145deg,#25131a,#140c0f);box-shadow:0 26px 90px rgba(0,0,0,.58)}
+    .gateCard h2{margin:5px 0 8px;font-size:1.5rem}.gateCard p{margin:0 0 18px;color:var(--muted);line-height:1.5;font-size:.9rem}
+    .gateCard label{margin-bottom:7px}.gateCard input{padding-right:14px}.gateCard .primary{width:100%;margin-top:10px}
+    .gateError{min-height:1.3em;margin-top:10px;color:#f0a5ae;font-size:.8rem;font-weight:700}
     button,input,select{font:inherit}
     button{touch-action:manipulation}
     .wrap{width:min(1120px,calc(100% - 28px));margin:0 auto;padding:34px 0 50px}
@@ -107,6 +115,9 @@
     .grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(350px,.88fr);gap:20px;align-items:start}
     .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     label{display:block;color:#eee4e1;font-size:.88rem;font-weight:750;margin:0 0 7px}
+    .fieldLabel{display:flex;align-items:center;gap:7px;margin-bottom:7px}.fieldLabel label{margin:0}
+    .infoButton{width:20px;height:20px;flex:0 0 20px;display:grid;place-items:center;padding:0;border:1px solid #79505a;border-radius:50%;background:#25151b;color:#e8cdd4;font:800 .72rem/1 Georgia,serif}
+    .infoButton:hover{background:var(--burgundy);filter:none}
     .hint{display:block;color:var(--muted);font-size:.75rem;font-weight:500;margin-top:4px;line-height:1.35}
     .input{position:relative;min-width:0}
     .suffix{position:absolute;right:13px;bottom:13px;color:var(--muted);font-size:.82rem;pointer-events:none}
@@ -161,6 +172,12 @@
     .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 0;color:var(--muted);font-size:.73rem}
     .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
     .dot.conservative{background:var(--burgundy-light)}.dot.realistic{background:var(--realistic-light)}.dot.optimistic{background:var(--pine-light)}.dot.market{background:var(--neutral)}
+    .infoDialog{width:min(calc(100% - 28px),540px);padding:0;border:1px solid #65434c;border-radius:20px;background:#1c1015;color:var(--text);box-shadow:0 26px 90px rgba(0,0,0,.62)}
+    .infoDialog::backdrop{background:rgba(7,4,5,.72);backdrop-filter:blur(5px)}
+    .infoDialogHead{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line)}
+    .infoDialogHead h2{margin:0;font-size:1.08rem}.dialogClose{width:34px;height:34px;padding:0;border-radius:50%;background:#2a191f;color:var(--text);font-size:1.25rem}
+    .infoDialogBody{padding:20px}.infoTerms{padding:11px 13px;border-radius:12px;background:rgba(143,41,71,.14);color:#f0d9df;font-size:.84rem;font-weight:800;line-height:1.45}
+    .infoDescription{margin:14px 0 0;color:#d3c6c3;font-size:.9rem;line-height:1.6}.infoTip{margin:13px 0 0;color:var(--muted);font-size:.8rem;line-height:1.55}
     footer{margin-top:18px;color:#978683;font-size:.75rem;line-height:1.55;text-align:center}
     @media(max-width:900px){
       .grid{grid-template-columns:1fr}
@@ -185,7 +202,18 @@
     }
   </style>
 </head>
-<body>
+<body class="gate-active">
+<section class="accessGate" id="accessGate" aria-labelledby="gateTitle">
+  <form class="gateCard" id="accessForm">
+    <div class="eyebrow">Geschützter Bereich</div>
+    <h2 id="gateTitle">Passwort erforderlich</h2>
+    <p>Bitte gib das Passwort ein, um den Fair-Value-Rechner zu öffnen.</p>
+    <label for="accessPassword">Passwort</label>
+    <input id="accessPassword" type="password" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="current-password" required>
+    <button class="primary" id="accessSubmit" type="submit">Rechner öffnen</button>
+    <div class="gateError" id="gateError" role="alert" aria-live="polite"></div>
+  </form>
+</section>
 <main class="wrap">
   <header>
     <div class="eyebrow">Fundamentale Aktienbewertung</div>
@@ -239,27 +267,27 @@
         <div class="pad">
           <div class="fields">
             <div>
-              <label for="price">Aktueller Aktienkurs</label>
+              <div class="fieldLabel"><label for="price">Aktueller Aktienkurs</label><button class="infoButton" type="button" data-help="price" aria-label="Erklärung zum aktuellen Aktienkurs">i</button></div>
               <div class="input"><input id="price" type="number" inputmode="decimal" step="0.01" min="0"><span class="suffix" id="cur1">€</span></div>
               <span class="hint">Der aktuelle Marktpreis je Aktie.</span>
             </div>
             <div>
-              <label for="eps">Gewinn je Aktie (EPS)</label>
+              <div class="fieldLabel"><label for="eps">Gewinn je Aktie (EPS)</label><button class="infoButton" type="button" data-help="eps" aria-label="Erklärung zum Gewinn je Aktie">i</button></div>
               <div class="input"><input id="eps" type="number" inputmode="decimal" step="0.01"><span class="suffix" id="cur2">€</span></div>
               <span class="hint">Gewinn je Aktie der letzten zwölf Monate.</span>
             </div>
             <div>
-              <label for="return">Persönliche Zielrendite p. a.</label>
-              <div class="input"><input id="return" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div>
+              <div class="fieldLabel"><label for="return">Persönliche Zielrendite p. a.</label><button class="infoButton" type="button" data-help="return" aria-label="Erklärung zur persönlichen Zielrendite">i</button></div>
+              <div class="input"><input id="return" type="number" inputmode="decimal" step="0.1" value="10"><span class="suffix">%</span></div>
               <span class="hint">Bleibt immer deine persönliche Eingabe.</span>
             </div>
             <div>
-              <label for="years">Betrachtungszeitraum</label>
-              <div class="input"><input id="years" type="number" inputmode="numeric" step="1" min="1" max="30"><span class="suffix">Jahre</span></div>
+              <div class="fieldLabel"><label for="years">Betrachtungszeitraum</label><button class="infoButton" type="button" data-help="years" aria-label="Erklärung zum Betrachtungszeitraum">i</button></div>
+              <div class="input"><input id="years" type="number" inputmode="numeric" step="1" min="1" max="30" value="5"><span class="suffix">Jahre</span></div>
               <span class="hint">Standardmäßig werden fünf Jahre betrachtet.</span>
             </div>
             <div>
-              <label for="currency">Währung</label>
+              <div class="fieldLabel"><label for="currency">Währung</label><button class="infoButton" type="button" data-help="currency" aria-label="Erklärung zur Währung">i</button></div>
               <select id="currency">
                 <option value="EUR" selected>EUR (€)</option><option value="USD">USD ($)</option>
                 <option value="GBP">GBP (£)</option><option value="CHF">CHF</option>
@@ -271,24 +299,24 @@
             <div class="scenario">
               <h3>Konservativ <span>niedrige Annahme</span></h3>
               <div class="mini">
-                <div><label for="growthC">EPS-Wachstum p. a.</label><div class="input"><input id="growthC" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
-                <div><label for="peC">Faires KGV</label><div class="input"><input id="peC" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
+                <div><div class="fieldLabel"><label for="growthC">EPS-Wachstum p. a.</label><button class="infoButton" type="button" data-help="growth" aria-label="Erklärung zum EPS-Wachstum">i</button></div><div class="input"><input id="growthC" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
+                <div><div class="fieldLabel"><label for="peC">Faires KGV</label><button class="infoButton" type="button" data-help="pe" aria-label="Erklärung zum fairen KGV">i</button></div><div class="input"><input id="peC" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
               </div>
               <div class="scenarioResult"><b id="fairC">–</b><span id="marginC">Fair Value</span></div>
             </div>
             <div class="scenario">
               <h3>Realistisch <span>Konsens</span></h3>
               <div class="mini">
-                <div><label for="growthR">EPS-Wachstum p. a.</label><div class="input"><input id="growthR" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
-                <div><label for="peR">Faires KGV</label><div class="input"><input id="peR" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
+                <div><div class="fieldLabel"><label for="growthR">EPS-Wachstum p. a.</label><button class="infoButton" type="button" data-help="growth" aria-label="Erklärung zum EPS-Wachstum">i</button></div><div class="input"><input id="growthR" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
+                <div><div class="fieldLabel"><label for="peR">Faires KGV</label><button class="infoButton" type="button" data-help="pe" aria-label="Erklärung zum fairen KGV">i</button></div><div class="input"><input id="peR" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
               </div>
               <div class="scenarioResult"><b id="fairR">–</b><span id="marginR">Fair Value</span></div>
             </div>
             <div class="scenario">
               <h3>Optimistisch <span>hohe Annahme</span></h3>
               <div class="mini">
-                <div><label for="growthO">EPS-Wachstum p. a.</label><div class="input"><input id="growthO" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
-                <div><label for="peO">Faires KGV</label><div class="input"><input id="peO" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
+                <div><div class="fieldLabel"><label for="growthO">EPS-Wachstum p. a.</label><button class="infoButton" type="button" data-help="growth" aria-label="Erklärung zum EPS-Wachstum">i</button></div><div class="input"><input id="growthO" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
+                <div><div class="fieldLabel"><label for="peO">Faires KGV</label><button class="infoButton" type="button" data-help="pe" aria-label="Erklärung zum fairen KGV">i</button></div><div class="input"><input id="peO" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
               </div>
               <div class="scenarioResult"><b id="fairO">–</b><span id="marginO">Fair Value</span></div>
             </div>
@@ -296,7 +324,7 @@
 
           <div class="actions">
             <button class="primary" id="calc" type="button">Fair Value berechnen</button>
-            <button class="secondary" id="reset" type="button" title="Alle Eingabefelder leeren">↺</button>
+            <button class="secondary" id="reset" type="button" title="Eingabefelder zurücksetzen">↺</button>
           </div>
 
           <div class="formula">
@@ -339,12 +367,26 @@
   <footer>Hinweis: Dieses Tool bildet ein vereinfachtes Bewertungsmodell ab. Automatische Finanzdaten und Analystenschätzungen können unvollständig oder verzögert sein. Das Ergebnis ist keine Anlageberatung und keine Garantie für die künftige Kursentwicklung.</footer>
 </main>
 
+<dialog class="infoDialog" id="infoDialog" aria-labelledby="infoTitle">
+  <div class="infoDialogHead"><h2 id="infoTitle">Information</h2><button class="dialogClose" id="infoClose" type="button" aria-label="Fenster schließen">×</button></div>
+  <div class="infoDialogBody"><div class="infoTerms" id="infoTerms"></div><p class="infoDescription" id="infoDescription"></p><p class="infoTip" id="infoTip"></p></div>
+</dialog>
+
 <script>
 (() => {
   const $ = id => document.getElementById(id);
   const inputIds = ['price','eps','return','years','growthC','peC','growthR','peR','growthO','peO'];
   const symbols = {EUR:'€',USD:'$',GBP:'£',CHF:'CHF'};
-  const defaults = {price:'',eps:'',return:'',years:'',growthC:'',peC:'',growthR:'',peR:'',growthO:'',peO:''};
+  const defaults = {price:'',eps:'',return:10,years:5,growthC:'',peC:'',growthR:'',peR:'',growthO:'',peO:''};
+  const helpContent={
+    price:{title:'Aktueller Aktienkurs',terms:'Aktienkurs · Share Price · Stock Price · Current Price',description:'Trage den derzeitigen Marktpreis für genau eine Aktie ein. Der Wert sollte möglichst aktuell sein und in derselben Währung vorliegen wie der Gewinn je Aktie.',tip:'Bei Yahoo Finanzen ist dies der groß angezeigte aktuelle Kurs auf der Übersichtsseite der Aktie.'},
+    eps:{title:'Gewinn je Aktie',terms:'Gewinn je Aktie (GjA) · Earnings per Share (EPS) · EPS (TTM)',description:'Der Gewinn je Aktie zeigt, wie viel Unternehmensgewinn rechnerisch auf eine einzelne Aktie entfällt. Verwende möglichst den verwässerten Gewinn je Aktie der letzten zwölf Monate.',tip:'Bei Yahoo Finanzen heißt der gesuchte Wert häufig „Verwässertes EPS (TTM)“ oder „EPS (TTM)“. TTM bedeutet „Trailing Twelve Months“, also die vergangenen zwölf Monate.'},
+    return:{title:'Persönliche Zielrendite',terms:'Zielrendite · Required Rate of Return · Discount Rate · Hurdle Rate',description:'Die Zielrendite ist die jährliche Rendite, die du für dein eingesetztes Kapital mindestens erreichen möchtest. Sie wird verwendet, um den erwarteten Zukunftswert auf den heutigen fairen Wert abzuzinsen.',tip:'10 % sind als veränderbarer Ausgangswert eingetragen. Eine höhere Zielrendite führt zu einem niedrigeren Fair Value und damit zu einer strengeren Bewertung.'},
+    years:{title:'Betrachtungszeitraum',terms:'Betrachtungszeitraum · Investment Horizon · Forecast Period',description:'Der Betrachtungszeitraum legt fest, wie viele Jahre das angenommene Gewinnwachstum und die Zielrendite in der Berechnung wirken.',tip:'Fünf Jahre sind voreingestellt, weil viele Analystenplattformen ihre langfristigen Wachstumsprognosen ebenfalls über ungefähr fünf Jahre angeben.'},
+    currency:{title:'Währung',terms:'Währung · Currency · Trading Currency · Reporting Currency',description:'Wähle die Währung, in der Aktienkurs und Gewinn je Aktie angegeben sind. Beide Werte müssen in derselben Währung vorliegen.',tip:'Bei automatisch geladenen Daten stellt der Rechner die von FMP gelieferte Währung selbst ein. Bei manueller Eingabe findest du die Handelswährung meist direkt neben dem Aktienkurs.'},
+    growth:{title:'EPS-Wachstum pro Jahr',terms:'EPS-Wachstum · Earnings Growth · EPS Growth · CAGR',description:'Hier wird eingetragen, um wie viel Prozent der Gewinn je Aktie voraussichtlich pro Jahr wächst. CAGR bezeichnet dabei die durchschnittliche jährliche Wachstumsrate.',tip:'Achte bei Finanzportalen auf Angaben wie „EPS Growth“, „Earnings Growth“ oder „Next 5 Years (per annum)“. Konservativ, realistisch und optimistisch bilden drei unterschiedlich vorsichtige Annahmen ab.'},
+    pe:{title:'Faires KGV',terms:'Kurs-Gewinn-Verhältnis (KGV) · Price/Earnings Ratio (P/E oder PE)',description:'Das faire KGV ist das Bewertungsvielfache, das du der Aktie am Ende des Betrachtungszeitraums zugestehst. Zukunfts-EPS × faires KGV ergibt den angenommenen Zukunftskurs.',tip:'Als Orientierung dienen das historische durchschnittliche KGV, das aktuelle KGV und die üblichen Bewertungen vergleichbarer Unternehmen. Das konservative KGV sollte niedriger, das optimistische höher angesetzt werden.'}
+  };
   const searchMemo=new Map();
   let stockCatalog=[];
   let selectedSymbol='';
@@ -352,6 +394,7 @@
   let activeSuggestion=-1;
   let searchTimer;
   let searchRequest=0;
+  let initialized=false;
 
   function num(id){ const value=$(id).value.trim();return value===''?NaN:Number(value); }
   function setNumber(id,value){ if(Number.isFinite(Number(value))) $(id).value=Number(value).toFixed(2).replace(/\.00$/,''); }
@@ -392,7 +435,7 @@
   function calculate(){
     const price=num('price'),eps=num('eps'),target=num('return'),years=num('years');
     const values=inputIds.map(num);
-    if(values.every(value=>!Number.isFinite(value))){clearResults();return;}
+    if(['price','eps','growthC','peC','growthR','peR','growthO','peO'].every(id=>!Number.isFinite(num(id)))){clearResults();return;}
     if(!values.every(Number.isFinite)||price<=0||eps<=0||years<=0||target<=-100){
       clearResults('Eingaben vervollständigen','Bitte alle Felder mit gültigen Werten ausfüllen.');return;
     }
@@ -451,7 +494,7 @@
     $('loadedAnalysts').textContent=Number.isFinite(Number(analysts))?String(analysts):'–';
     $('loadedAt').textContent=payload.updatedAt||stock.updatedAt||'aktuell';
     $('dataPanel').classList.add('visible');$('manualDetails').open=false;
-    setStatus('success','Finanzdaten automatisch geladen',`${stock.name||stock.symbol||'Die Aktie'} wurde über FMP geladen. Ergänze noch deine Zielrendite und den Betrachtungszeitraum; anschließend wird der Fair Value berechnet.`);
+    setStatus('success','Finanzdaten automatisch geladen',`${stock.name||stock.symbol||'Die Aktie'} wurde über FMP geladen. Die Berechnung wurde mit deiner eingestellten Zielrendite und dem Betrachtungszeitraum aktualisiert.`);
     calculate();
   }
   async function loadStock(query){
@@ -467,7 +510,9 @@
       applyAutomaticData(data.data||data);
     }catch(error){
       const code=String(error.message||'');
-      if(error.status===429||/LIMIT|QUOTA|TOO_MANY/i.test(code)){
+      if(error.status===401||/PASSWORD_REQUIRED/i.test(code)){
+        showGate('Deine Sitzung ist abgelaufen. Bitte gib das aktuelle Passwort erneut ein.');
+      }else if(error.status===429||/LIMIT|QUOTA|TOO_MANY/i.test(code)){
         manualFallback('Tageslimit erreicht – manuelle Eingabe aktiviert','Die automatische Abfrage ist heute ausgeschöpft. Alle Eingabefelder bleiben verfügbar und der Rechner funktioniert weiterhin vollständig.');
       }else if(/API_KEY_MISSING/i.test(code)){
         manualFallback('FMP-Schlüssel im Worker nicht verfügbar','Cloudflare führt den Worker aus, übergibt ihm aber das Geheimnis FMP_API_KEY noch nicht. Bitte das Geheimnis bei den Laufzeitvariablen des Workers prüfen.');
@@ -568,6 +613,28 @@
       selectedSymbol=items[0].symbol;$('stockQuery').value=`${items[0].name||items[0].symbol} (${items[0].symbol})`;loadStock(items[0].symbol);
     }else loadStock(query);
   }
+  function initializeApp(){
+    if(initialized)return;initialized=true;loadCatalog();calculate();
+  }
+  function showGate(message=''){
+    document.body.classList.add('gate-active');$('accessGate').hidden=false;$('gateError').textContent=message;
+    setTimeout(()=>$('accessPassword').focus(),50);
+  }
+  function unlockPage(){
+    $('accessGate').hidden=true;document.body.classList.remove('gate-active');$('gateError').textContent='';$('accessPassword').value='';initializeApp();
+  }
+  async function checkAccess(){
+    try{
+      const response=await fetch('/api/session',{headers:{Accept:'application/json'}});const data=await response.json();
+      if(response.ok&&data.ok===true){unlockPage();return;}
+    }catch{}
+    showGate();
+  }
+  function openHelp(key){
+    const content=helpContent[key];if(!content)return;
+    $('infoTitle').textContent=content.title;$('infoTerms').textContent=content.terms;$('infoDescription').textContent=content.description;$('infoTip').textContent=content.tip;
+    $('infoDialog').showModal();
+  }
 
   $('stockForm').addEventListener('submit',event=>{
     event.preventDefault();const query=$('stockQuery').value.trim();
@@ -586,6 +653,21 @@
     else if(event.key==='Escape')closeSuggestions();
   });
   document.addEventListener('click',event=>{if(!event.target.closest('.searchInput'))closeSuggestions();});
+  document.querySelectorAll('.infoButton').forEach(button=>button.addEventListener('click',()=>openHelp(button.dataset.help)));
+  $('infoClose').addEventListener('click',()=>$('infoDialog').close());
+  $('infoDialog').addEventListener('click',event=>{if(event.target===$('infoDialog'))$('infoDialog').close();});
+  $('accessForm').addEventListener('submit',async event=>{
+    event.preventDefault();const password=$('accessPassword').value.trim();
+    $('accessSubmit').disabled=true;$('gateError').textContent='Passwort wird geprüft …';
+    try{
+      const response=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({password})});
+      const data=await response.json();
+      if(!response.ok||data.ok!==true)throw new Error(data.code||'LOGIN_FAILED');
+      unlockPage();
+    }catch(error){
+      $('gateError').textContent=/INVALID_PASSWORD/.test(String(error.message))?'Das eingegebene Passwort ist nicht korrekt.':'Der Zugang konnte momentan nicht geprüft werden.';$('accessPassword').select();
+    }finally{$('accessSubmit').disabled=false;}
+  });
   $('catalogToggle').addEventListener('click',()=>{
     const willOpen=$('stockCatalog').hidden;$('stockCatalog').hidden=!willOpen;
     $('catalogToggle').setAttribute('aria-expanded',String(willOpen));$('catalogToggle').textContent=willOpen?'Aktienliste schließen':'Alle 87 Aktien anzeigen';
@@ -596,10 +678,9 @@
   $('reset').addEventListener('click',()=>{
     Object.entries(defaults).forEach(([key,value])=>$(key).value=value);setCurrency('EUR');
     $('stockQuery').value='';selectedSymbol='';closeSuggestions();$('dataPanel').classList.remove('visible');$('manualDetails').open=true;
-    setStatus('','Eingabefelder geleert','Du kannst eine Aktie automatisch laden oder alle Werte selbst eintragen.');calculate();
+    setStatus('','Eingabefelder zurückgesetzt','Zielrendite und Betrachtungszeitraum wurden auf die Ausgangswerte zurückgesetzt.');calculate();
   });
-  loadCatalog();
-  calculate();
+  checkAccess();
 })();
 </script>
 </body>
