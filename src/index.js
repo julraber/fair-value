@@ -2,15 +2,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Erster Test der Alpha-Vantage-Verbindungen
     if (url.pathname === "/api/alpha-vantage-test") {
       if (!env.ALPHA_VANTAGE_API_KEY) {
         return Response.json(
           {
             ok: false,
-            error: "Der Alpha-Vantage-API-Key wurde noch nicht hinterlegt."
+            error: "Der API-Schlüssel ist derzeit nicht konfiguriert."
           },
-          { status: 500 }
+          {
+            status: 500,
+            headers: { "Cache-Control": "no-store" }
+          }
         );
       }
 
@@ -19,19 +21,67 @@ export default {
       apiUrl.searchParams.set("symbol", "AAPL");
       apiUrl.searchParams.set("apikey", env.ALPHA_VANTAGE_API_KEY);
 
-      const apiResponse = await fetch(apiUrl);
-      const data = await apiResponse.text();
+      try {
+        const apiResponse = await fetch(apiUrl);
+        let data;
 
-      return new Response(data, {
-        status: apiResponse.status,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "no-store"
+        try {
+          data = await apiResponse.json();
+        } catch {
+          return Response.json(
+            {
+              ok: false,
+              error: "Alpha Vantage hat keine gültige JSON-Antwort geliefert."
+            },
+            {
+              status: 502,
+              headers: { "Cache-Control": "no-store" }
+            }
+          );
         }
-      });
+
+        if (
+          !apiResponse.ok ||
+          data.Information ||
+          data.Note ||
+          data["Error Message"]
+        ) {
+          return Response.json(
+            {
+              ok: false,
+              error:
+                "Alpha Vantage hat die Anfrage abgelehnt oder das kostenlose Kontingent ist nicht verfügbar."
+            },
+            {
+              status: 502,
+              headers: { "Cache-Control": "no-store" }
+            }
+          );
+        }
+
+        return Response.json(
+          {
+            ok: true,
+            data
+          },
+          {
+            headers: { "Cache-Control": "no-store" }
+          }
+        );
+      } catch {
+        return Response.json(
+          {
+            ok: false,
+            error: "Die Verbindung zum Finanzdatenanbieter ist fehlgeschlagen."
+          },
+          {
+            status: 502,
+            headers: { "Cache-Control": "no-store" }
+          }
+        );
+      }
     }
 
-    // Alle normalen Aufrufe laden weiterhin deine Website
     return env.ASSETS.fetch(request);
   }
 };
