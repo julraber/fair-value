@@ -2,7 +2,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Erster Test der Alpha-Vantage-Verbindung
+    // Erster Test der Alpha-Vantage-Verbindungen
     if (url.pathname === "/api/alpha-vantage-test") {
       if (!env.ALPHA_VANTAGE_API_KEY) {
         return Response.json(
