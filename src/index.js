@@ -272,14 +272,14 @@ function publicError(error) {
   const code = error instanceof ApiError ? error.code : "INTERNAL_ERROR";
   const status = error instanceof ApiError ? error.status : 500;
   const messages = {
-    MISSING_QUERY: "Bitte einen Unternehmensnamen oder ein BÃ¶rsenkÃ¼rzel eingeben.",
+    MISSING_QUERY: "Bitte einen Unternehmensnamen oder ein Börsenkürzel eingeben.",
     NOT_FOUND: "Die Aktie wurde nicht gefunden.",
-    NOT_SUPPORTED: "FÃ¼r diese Aktie sind im kostenlosen Tarif nicht alle benÃ¶tigten Daten verfÃ¼gbar.",
-    INCOMPLETE_DATA: "FÃ¼r diese Aktie fehlen einzelne Werte fÃ¼r die automatische Berechnung.",
-    DAILY_LIMIT: "Das tÃ¤gliche API-Kontingent ist derzeit ausgeschÃ¶pft.",
+    NOT_SUPPORTED: "Für diese Aktie sind im kostenlosen Tarif nicht alle benötigten Daten verfügbar.",
+    INCOMPLETE_DATA: "Für diese Aktie fehlen einzelne Werte für die automatische Berechnung.",
+    DAILY_LIMIT: "Das tägliche API-Kontingent ist derzeit ausgeschöpft.",
     API_KEY_REJECTED: "Der Finanzdatenanbieter hat die Anmeldung abgelehnt.",
     PROVIDER_UNAVAILABLE: "Der Finanzdatenanbieter ist momentan nicht erreichbar.",
-    INVALID_PROVIDER_RESPONSE: "Der Finanzdatenanbieter hat eine ungÃ¼ltige Antwort geliefert.",
+    INVALID_PROVIDER_RESPONSE: "Der Finanzdatenanbieter hat eine ungültige Antwort geliefert.",
     PROVIDER_ERROR: "Der Finanzdatenanbieter konnte die Anfrage nicht verarbeiten.",
     INTERNAL_ERROR: "Die Finanzdaten konnten momentan nicht geladen werden."
   };
@@ -302,7 +302,7 @@ export default {
         return json({
           ok: false,
           code: "API_KEY_MISSING",
-          error: "Der FMP-API-SchlÃ¼ssel ist noch nicht konfiguriert."
+          error: "Der FMP-API-Schlüssel ist noch nicht konfiguriert."
         }, 500);
       }
 
