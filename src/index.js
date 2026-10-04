@@ -1,6 +1,38 @@
 const FMP_BASE_URL = "https://financialmodelingprep.com/stable";
 const CACHE_SECONDS = 6 * 60 * 60;
-const SEARCH_CACHE_SECONDS = 24 * 60 * 60;
+const FREE_STOCKS = [
+  ["AAPL", "Apple Inc."], ["TSLA", "Tesla Inc."], ["AMZN", "Amazon.com Inc."],
+  ["MSFT", "Microsoft Corporation"], ["NVDA", "NVIDIA Corporation"], ["GOOGL", "Alphabet Inc."],
+  ["META", "Meta Platforms Inc."], ["NFLX", "Netflix Inc."], ["JPM", "JPMorgan Chase & Co."],
+  ["V", "Visa Inc."], ["BAC", "Bank of America Corporation"], ["AMD", "Advanced Micro Devices Inc."],
+  ["PYPL", "PayPal Holdings Inc."], ["DIS", "The Walt Disney Company"], ["T", "AT&T Inc."],
+  ["PFE", "Pfizer Inc."], ["COST", "Costco Wholesale Corporation"], ["INTC", "Intel Corporation"],
+  ["KO", "The Coca-Cola Company"], ["TGT", "Target Corporation"], ["NKE", "Nike Inc."],
+  ["SPY", "SPDR S&P 500 ETF Trust"], ["BA", "The Boeing Company"], ["BABA", "Alibaba Group Holding Ltd."],
+  ["XOM", "Exxon Mobil Corporation"], ["WMT", "Walmart Inc."], ["GE", "GE Aerospace"],
+  ["CSCO", "Cisco Systems Inc."], ["VZ", "Verizon Communications Inc."], ["JNJ", "Johnson & Johnson"],
+  ["CVX", "Chevron Corporation"], ["PLTR", "Palantir Technologies Inc."], ["SQ", "Block Inc."],
+  ["SHOP", "Shopify Inc."], ["SBUX", "Starbucks Corporation"], ["SOFI", "SoFi Technologies Inc."],
+  ["HOOD", "Robinhood Markets Inc."], ["RBLX", "Roblox Corporation"], ["SNAP", "Snap Inc."],
+  ["UBER", "Uber Technologies Inc."], ["FDX", "FedEx Corporation"], ["ABBV", "AbbVie Inc."],
+  ["ETSY", "Etsy Inc."], ["MRNA", "Moderna Inc."], ["LMT", "Lockheed Martin Corporation"],
+  ["GM", "General Motors Company"], ["F", "Ford Motor Company"], ["RIVN", "Rivian Automotive Inc."],
+  ["LCID", "Lucid Group Inc."], ["CCL", "Carnival Corporation"], ["DAL", "Delta Air Lines Inc."],
+  ["UAL", "United Airlines Holdings Inc."], ["AAL", "American Airlines Group Inc."],
+  ["TSM", "Taiwan Semiconductor Manufacturing Company"], ["SONY", "Sony Group Corporation"],
+  ["ET", "Energy Transfer LP"], ["NOK", "Nokia Oyj"], ["MRO", "Marathon Oil Corporation"],
+  ["COIN", "Coinbase Global Inc."], ["SIRI", "Sirius XM Holdings Inc."], ["RIOT", "Riot Platforms Inc."],
+  ["CPRX", "Catalyst Pharmaceuticals Inc."], ["VWO", "Vanguard FTSE Emerging Markets ETF"],
+  ["SPYG", "SPDR Portfolio S&P 500 Growth ETF"], ["ROKU", "Roku Inc."], ["VIAC", "Paramount Global"],
+  ["ATVI", "Activision Blizzard Inc."], ["BIDU", "Baidu Inc."], ["DOCU", "DocuSign Inc."],
+  ["ZM", "Zoom Communications Inc."], ["PINS", "Pinterest Inc."], ["TLRY", "Tilray Brands Inc."],
+  ["WBA", "Walgreens Boots Alliance Inc."], ["MGM", "MGM Resorts International"], ["NIO", "NIO Inc."],
+  ["C", "Citigroup Inc."], ["GS", "The Goldman Sachs Group Inc."], ["WFC", "Wells Fargo & Company"],
+  ["ADBE", "Adobe Inc."], ["PEP", "PepsiCo Inc."], ["UNH", "UnitedHealth Group Inc."],
+  ["CARR", "Carrier Global Corporation"], ["FUBO", "FuboTV Inc."], ["HCA", "HCA Healthcare Inc."],
+  ["TWTR", "Twitter Inc."], ["BILI", "Bilibili Inc."], ["RKT", "Rocket Companies Inc."]
+].map(([symbol, name]) => ({ symbol, name }));
+const FREE_SYMBOLS = new Set(FREE_STOCKS.map(stock => stock.symbol));
 
 class ApiError extends Error {
   constructor(code, status = 502) {
@@ -141,63 +173,34 @@ async function fmpFetch(path, params, apiKey, stage) {
   return data;
 }
 
-function chooseSearchResult(results, query) {
-  if (!Array.isArray(results) || results.length === 0) return null;
-  const normalized = query.trim().toUpperCase();
-  const exactSymbol = results.find(
-    item => String(item.symbol || "").toUpperCase() === normalized
-  );
-  if (exactSymbol) return exactSymbol;
-
-  const usExchanges = new Set(["NASDAQ", "NYSE", "AMEX"]);
-  return (
-    results.find(item => usExchanges.has(String(item.exchangeShortName || item.exchange || "").toUpperCase())) ||
-    results[0]
-  );
-}
-
-function normalizeSearchResults(results, query) {
-  if (!Array.isArray(results)) return [];
+function searchStocks(query, limit = 10) {
   const normalizedQuery = query.trim().toUpperCase();
-  const preferredExchanges = new Set(["NASDAQ", "NYSE", "AMEX"]);
-  const seen = new Set();
-
-  return results
-    .filter(item => item && item.symbol && (item.name || item.companyName))
-    .map(item => ({
-      symbol: String(item.symbol).toUpperCase(),
-      name: String(item.name || item.companyName || item.symbol),
-      exchange: String(item.exchangeShortName || item.stockExchange || "").toUpperCase()
-    }))
-    .filter(item => {
-      if (seen.has(item.symbol)) return false;
-      seen.add(item.symbol);
-      return true;
+  if (!normalizedQuery) return [];
+  return FREE_STOCKS
+    .map(stock => {
+      const symbol = stock.symbol.toUpperCase();
+      const name = stock.name.toUpperCase();
+      let score = 99;
+      if (symbol === normalizedQuery) score = 0;
+      else if (name === normalizedQuery) score = 1;
+      else if (symbol.startsWith(normalizedQuery)) score = 2;
+      else if (name.startsWith(normalizedQuery)) score = 3;
+      else if (symbol.includes(normalizedQuery)) score = 4;
+      else if (name.includes(normalizedQuery)) score = 5;
+      return { ...stock, score };
     })
-    .sort((a, b) => {
-      const score = item => {
-        const symbol = item.symbol.toUpperCase();
-        const name = item.name.toUpperCase();
-        if (symbol === normalizedQuery) return 0;
-        if (name === normalizedQuery) return 1;
-        if (symbol.startsWith(normalizedQuery)) return 2;
-        if (name.startsWith(normalizedQuery)) return 3;
-        if (preferredExchanges.has(item.exchange)) return 4;
-        return 5;
-      };
-      return score(a) - score(b) || a.name.localeCompare(b.name);
-    })
-    .slice(0, 10);
+    .filter(stock => stock.score < 99)
+    .sort((a, b) => a.score - b.score || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map(({ score, ...stock }) => stock);
 }
 
-async function searchStocks(query, apiKey) {
-  const rows = await fmpFetch(
-    "/search-name",
-    { query: query.trim(), limit: 25 },
-    apiKey,
-    "SEARCH"
-  );
-  return normalizeSearchResults(rows, query);
+function resolveFreeStock(query) {
+  const normalized = query.trim().toUpperCase();
+  const exactSymbol = FREE_STOCKS.find(stock => stock.symbol === normalized);
+  if (exactSymbol) return exactSymbol;
+  const exactName = FREE_STOCKS.find(stock => stock.name.toUpperCase() === normalized);
+  return exactName || searchStocks(query, 1)[0] || null;
 }
 
 function buildPeBand(historicalRatios, currentPe) {
@@ -313,19 +316,9 @@ function buildStockPayload(symbol, quoteRows, ttmRatioRows, historicalRatios, es
 }
 
 async function getStockData(query, apiKey) {
-  const normalizedQuery = query.trim();
-  const looksLikeTicker = /^[A-Za-z0-9.-]{1,15}$/.test(normalizedQuery) &&
-    !/^(apple|tesla|alphabet|google|microsoft|amazon|nvidia|meta)$/i.test(normalizedQuery);
-
-  let symbol;
-  if (looksLikeTicker) {
-    symbol = normalizedQuery.toUpperCase();
-  } else {
-    const searchRows = await searchStocks(normalizedQuery, apiKey);
-    const result = chooseSearchResult(searchRows, normalizedQuery);
-    if (!result?.symbol) throw new ApiError("NOT_FOUND", 404);
-    symbol = String(result.symbol).toUpperCase();
-  }
+  const stock = resolveFreeStock(query);
+  if (!stock || !FREE_SYMBOLS.has(stock.symbol)) throw new ApiError("NOT_SUPPORTED", 422);
+  const symbol = stock.symbol;
 
   const [quoteRows, ttmRatioRows, historicalRatios, estimates] = await Promise.all([
     fmpFetch("/quote", { symbol }, apiKey, "QUOTE"),
@@ -379,8 +372,18 @@ export default {
     if (url.pathname === "/api/health") {
       return json({
         ok: true,
-        workerVersion: "6",
+        workerVersion: "7",
         fmpConfigured: Boolean(env.FMP_API_KEY)
+      });
+    }
+
+    if (url.pathname === "/api/stocks") {
+      if (request.method !== "GET") {
+        return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
+      }
+      const stocks = [...FREE_STOCKS].sort((a, b) => a.name.localeCompare(b.name));
+      return json({ ok: true, count: stocks.length, stocks }, 200, {
+        "Cache-Control": "public, max-age=86400"
       });
     }
 
@@ -388,30 +391,12 @@ export default {
       if (request.method !== "GET") {
         return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
       }
-      if (!env.FMP_API_KEY) {
-        return json({ ok: false, code: "API_KEY_MISSING", error: "Der FMP-API-Schlüssel ist noch nicht konfiguriert." }, 500);
-      }
-
       const query = (url.searchParams.get("q") || "").trim().slice(0, 80);
       if (!query) return publicError(new ApiError("MISSING_QUERY", 400));
-
-      const cache = caches.default;
-      const cacheKeyUrl = new URL(url);
-      cacheKeyUrl.searchParams.set("q", query.toLowerCase());
-      const cacheKey = new Request(cacheKeyUrl.toString(), { method: "GET" });
-      const cached = await cache.match(cacheKey);
-      if (cached) return cached;
-
-      try {
-        const results = await searchStocks(query, env.FMP_API_KEY);
-        const response = json({ ok: true, results }, 200, {
-          "Cache-Control": `public, max-age=${SEARCH_CACHE_SECONDS}`
-        });
-        ctx.waitUntil(cache.put(cacheKey, response.clone()));
-        return response;
-      } catch (error) {
-        return publicError(error);
-      }
+      const results = searchStocks(query);
+      return json({ ok: true, results }, 200, {
+        "Cache-Control": "public, max-age=86400"
+      });
     }
 
     if (url.pathname === "/api/stock") {

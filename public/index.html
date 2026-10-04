@@ -41,6 +41,16 @@
     .searchHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
     .sectionText{color:var(--muted);font-size:.84rem;line-height:1.5;margin:5px 0 0}
     .searchRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+    .stockTools{display:flex;align-items:center;gap:10px;margin-top:10px}
+    .stockTools .secondary{padding:10px 14px;font-size:.84rem}
+    .stockCatalog{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:16px;background:rgba(22,13,17,.94)}
+    .stockCatalog[hidden]{display:none}
+    .catalogHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+    .catalogHead strong{font-size:.9rem}.catalogHead span{display:block;color:var(--muted);font-size:.74rem;margin-top:3px}
+    .catalogGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;max-height:350px;overflow-y:auto;padding-right:3px}
+    .catalogStock{display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;padding:9px 10px;border:1px solid #493237;border-radius:10px;background:#201318;color:var(--text);font-size:.78rem}
+    .catalogStock:hover{border-color:var(--burgundy-light);background:#2a1720}
+    .catalogStockName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.catalogStockSymbol{flex:0 0 auto;color:var(--burgundy-light);font-weight:900}
     .searchInput{position:relative}
     .searchInput svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:19px;height:19px;color:#aa8e95;pointer-events:none}
     .searchInput input{padding-left:44px;padding-right:14px;font-size:1rem}
@@ -126,8 +136,8 @@
     .signal.strong{background:rgba(40,92,69,.32);border-color:rgba(86,161,124,.62);color:#d2efdf;box-shadow:0 0 30px rgba(40,92,69,.16)}
     .barBox{margin:16px 22px 4px}
     .barHead{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.76rem;margin-bottom:7px}
-    .bar{height:10px;background:#0b120f;border-radius:99px;overflow:hidden;border:1px solid var(--line)}
-    .bar>div{height:100%;width:0;background:linear-gradient(90deg,#8f2947 0%,#a23b58 28%,#815047 52%,#4f755f 76%,#285c45 100%);transition:width .35s ease}
+    .bar{height:10px;background:linear-gradient(90deg,#8f2947 0%,#b04b58 25%,#9b6a3f 50%,#5f7a4f 75%,#285c45 100%);border-radius:99px;overflow:hidden;border:1px solid var(--line);position:relative}
+    .bar>div{position:absolute;top:0;right:0;bottom:0;width:100%;background:#0b120f;transition:width .35s ease}
     .stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin:18px 22px 22px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
     .stat{background:var(--panel2);padding:14px}
     .stat .k{color:var(--muted);font-size:.73rem;margin-bottom:4px}
@@ -161,6 +171,7 @@
       .card{border-radius:18px}.pad,.resultTop{padding:18px}
       .searchHead{display:block}.searchHead .sectionText{margin-bottom:0}
       .searchRow{grid-template-columns:1fr}.searchRow button{width:100%}
+      .catalogGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .fields{grid-template-columns:1fr}.scenarioGrid{grid-template-columns:1fr}
       .dataPanel{grid-template-columns:1fr 1fr}.dataItem:last-child{grid-column:1/-1}
       .compactChart{padding-left:18px;padding-right:18px}.chart{height:200px}
@@ -170,6 +181,7 @@
     @media(max-width:390px){
       .stats{grid-template-columns:1fr}.dataPanel{grid-template-columns:1fr}
       .dataItem:last-child{grid-column:auto}
+      .catalogGrid{grid-template-columns:1fr}
     }
   </style>
 </head>
@@ -197,6 +209,13 @@
         </div>
         <button class="primary" id="loadStock" type="submit">Daten laden</button>
       </form>
+      <div class="stockTools">
+        <button class="secondary" id="catalogToggle" type="button" aria-expanded="false" aria-controls="stockCatalog">Alle 87 Aktien anzeigen</button>
+      </div>
+      <div class="stockCatalog" id="stockCatalog" hidden>
+        <div class="catalogHead"><div><strong>Im kostenlosen FMP-Tarif verfügbare Aktien</strong><span>Alphabetisch geordnet – eine Aktie anklicken, um sie sofort zu laden.</span></div></div>
+        <div class="catalogGrid" id="catalogGrid"></div>
+      </div>
       <div class="status" id="apiStatus" role="status" aria-live="polite">
         <i class="statusDot" aria-hidden="true"></i>
         <div><strong id="statusTitle">Bereit für die Aktiensuche</strong><span id="statusText">Suche oben nach einem Unternehmen oder Börsenkürzel. Falls automatische Daten fehlen, kannst du direkt manuell weiterrechnen.</span></div>
@@ -221,22 +240,22 @@
           <div class="fields">
             <div>
               <label for="price">Aktueller Aktienkurs</label>
-              <div class="input"><input id="price" type="number" inputmode="decimal" step="0.01" min="0" value="139"><span class="suffix" id="cur1">€</span></div>
+              <div class="input"><input id="price" type="number" inputmode="decimal" step="0.01" min="0"><span class="suffix" id="cur1">€</span></div>
               <span class="hint">Der aktuelle Marktpreis je Aktie.</span>
             </div>
             <div>
               <label for="eps">Gewinn je Aktie (EPS)</label>
-              <div class="input"><input id="eps" type="number" inputmode="decimal" step="0.01" value="6.15"><span class="suffix" id="cur2">€</span></div>
+              <div class="input"><input id="eps" type="number" inputmode="decimal" step="0.01"><span class="suffix" id="cur2">€</span></div>
               <span class="hint">Gewinn je Aktie der letzten zwölf Monate.</span>
             </div>
             <div>
               <label for="return">Persönliche Zielrendite p. a.</label>
-              <div class="input"><input id="return" type="number" inputmode="decimal" step="0.1" value="12"><span class="suffix">%</span></div>
+              <div class="input"><input id="return" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div>
               <span class="hint">Bleibt immer deine persönliche Eingabe.</span>
             </div>
             <div>
               <label for="years">Betrachtungszeitraum</label>
-              <div class="input"><input id="years" type="number" inputmode="numeric" step="1" min="1" max="30" value="5"><span class="suffix">Jahre</span></div>
+              <div class="input"><input id="years" type="number" inputmode="numeric" step="1" min="1" max="30"><span class="suffix">Jahre</span></div>
               <span class="hint">Standardmäßig werden fünf Jahre betrachtet.</span>
             </div>
             <div>
@@ -252,24 +271,24 @@
             <div class="scenario">
               <h3>Konservativ <span>niedrige Annahme</span></h3>
               <div class="mini">
-                <div><label for="growthC">EPS-Wachstum p. a.</label><div class="input"><input id="growthC" type="number" inputmode="decimal" step="0.1" value="6"><span class="suffix">%</span></div></div>
-                <div><label for="peC">Faires KGV</label><div class="input"><input id="peC" type="number" inputmode="decimal" step="0.1" value="18"><span class="suffix">×</span></div></div>
+                <div><label for="growthC">EPS-Wachstum p. a.</label><div class="input"><input id="growthC" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
+                <div><label for="peC">Faires KGV</label><div class="input"><input id="peC" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
               </div>
               <div class="scenarioResult"><b id="fairC">–</b><span id="marginC">Fair Value</span></div>
             </div>
             <div class="scenario">
               <h3>Realistisch <span>Konsens</span></h3>
               <div class="mini">
-                <div><label for="growthR">EPS-Wachstum p. a.</label><div class="input"><input id="growthR" type="number" inputmode="decimal" step="0.1" value="10"><span class="suffix">%</span></div></div>
-                <div><label for="peR">Faires KGV</label><div class="input"><input id="peR" type="number" inputmode="decimal" step="0.1" value="23"><span class="suffix">×</span></div></div>
+                <div><label for="growthR">EPS-Wachstum p. a.</label><div class="input"><input id="growthR" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
+                <div><label for="peR">Faires KGV</label><div class="input"><input id="peR" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
               </div>
               <div class="scenarioResult"><b id="fairR">–</b><span id="marginR">Fair Value</span></div>
             </div>
             <div class="scenario">
               <h3>Optimistisch <span>hohe Annahme</span></h3>
               <div class="mini">
-                <div><label for="growthO">EPS-Wachstum p. a.</label><div class="input"><input id="growthO" type="number" inputmode="decimal" step="0.1" value="14"><span class="suffix">%</span></div></div>
-                <div><label for="peO">Faires KGV</label><div class="input"><input id="peO" type="number" inputmode="decimal" step="0.1" value="28"><span class="suffix">×</span></div></div>
+                <div><label for="growthO">EPS-Wachstum p. a.</label><div class="input"><input id="growthO" type="number" inputmode="decimal" step="0.1"><span class="suffix">%</span></div></div>
+                <div><label for="peO">Faires KGV</label><div class="input"><input id="peO" type="number" inputmode="decimal" step="0.1"><span class="suffix">×</span></div></div>
               </div>
               <div class="scenarioResult"><b id="fairO">–</b><span id="marginO">Fair Value</span></div>
             </div>
@@ -277,7 +296,7 @@
 
           <div class="actions">
             <button class="primary" id="calc" type="button">Fair Value berechnen</button>
-            <button class="secondary" id="reset" type="button" title="Beispielwerte wiederherstellen">↺</button>
+            <button class="secondary" id="reset" type="button" title="Alle Eingabefelder leeren">↺</button>
           </div>
 
           <div class="formula">
@@ -325,15 +344,16 @@
   const $ = id => document.getElementById(id);
   const inputIds = ['price','eps','return','years','growthC','peC','growthR','peR','growthO','peO'];
   const symbols = {EUR:'€',USD:'$',GBP:'£',CHF:'CHF'};
-  const defaults = {price:139,eps:6.15,return:12,years:5,growthC:6,peC:18,growthR:10,peR:23,growthO:14,peO:28};
+  const defaults = {price:'',eps:'',return:'',years:'',growthC:'',peC:'',growthR:'',peR:'',growthO:'',peO:''};
   const searchMemo=new Map();
+  let stockCatalog=[];
   let selectedSymbol='';
   let suggestions=[];
   let activeSuggestion=-1;
   let searchTimer;
   let searchRequest=0;
 
-  function num(id){ return Number($(id).value); }
+  function num(id){ const value=$(id).value.trim();return value===''?NaN:Number(value); }
   function setNumber(id,value){ if(Number.isFinite(Number(value))) $(id).value=Number(value).toFixed(2).replace(/\.00$/,''); }
   function money(value){
     return new Intl.NumberFormat('de-DE',{style:'currency',currency:$('currency').value,maximumFractionDigits:2}).format(value);
@@ -362,11 +382,19 @@
   function manualFallback(title,text){
     setStatus('error',title,text);$('manualDetails').open=true;$('dataPanel').classList.remove('visible');
   }
+  function clearResults(title='Noch keine Bewertung',text='Lade eine Aktie oder fülle die Eingabefelder aus.'){
+    ['fair','futureEps','futurePrice','diff','valuation','fairC','fairR','fairO','valC','valR','valO','valM'].forEach(id=>$(id).textContent='–');
+    ['marginC','marginR','marginO'].forEach(id=>$(id).textContent='Fair Value');
+    ['barC','barR','barO','barM'].forEach(id=>$(id).style.height='2%');
+    $('comparison').textContent='Werte eingeben und berechnen.';$('marginLabel').textContent='–';$('barFill').style.width='100%';
+    setSignal('neutral',title,text);
+  }
   function calculate(){
     const price=num('price'),eps=num('eps'),target=num('return'),years=num('years');
     const values=inputIds.map(num);
+    if(values.every(value=>!Number.isFinite(value))){clearResults();return;}
     if(!values.every(Number.isFinite)||price<=0||eps<=0||years<=0||target<=-100){
-      setSignal('bad','Eingaben prüfen','Bitte gültige Werte eingeben.');return;
+      clearResults('Eingaben vervollständigen','Bitte alle Felder mit gültigen Werten ausfüllen.');return;
     }
     const C=scenario(eps,num('growthC'),num('peC'),target,years);
     const R=scenario(eps,num('growthR'),num('peR'),target,years);
@@ -396,7 +424,8 @@
       $('comparison').textContent=`Der Marktpreis liegt ${pct(margin)} unter dem realistischen Fair Value.`;
       setSignal('strong','Dringendes Kaufsignal nach dem Modell','Die berechnete Sicherheitsmarge beträgt mindestens 50 %. Annahmen und Risiken besonders sorgfältig prüfen.');
     }
-    $('marginLabel').textContent=margin>0?pct(margin):'0,0 %';$('barFill').style.width=Math.max(0,Math.min(100,margin*2))+'%';
+    const marginProgress=Math.max(0,Math.min(100,margin));
+    $('marginLabel').textContent=margin>0?pct(margin):'0,0 %';$('barFill').style.width=(100-marginProgress)+'%';
     const max=Math.max(price,...all.map(item=>item.fair))*1.12;
     [['C',C.fair],['R',R.fair],['O',O.fair],['M',price]].forEach(([key,value])=>{
       $('bar'+key).style.height=Math.max(2,value/max*100)+'%';$('val'+key).textContent=money(value);
@@ -422,7 +451,7 @@
     $('loadedAnalysts').textContent=Number.isFinite(Number(analysts))?String(analysts):'–';
     $('loadedAt').textContent=payload.updatedAt||stock.updatedAt||'aktuell';
     $('dataPanel').classList.add('visible');$('manualDetails').open=false;
-    setStatus('success','Finanzdaten automatisch geladen',`${stock.name||stock.symbol||'Die Aktie'} wurde über FMP geladen. Du kannst alle Werte manuell öffnen und verändern.`);
+    setStatus('success','Finanzdaten automatisch geladen',`${stock.name||stock.symbol||'Die Aktie'} wurde über FMP geladen. Ergänze noch deine Zielrendite und den Betrachtungszeitraum; anschließend wird der Fair Value berechnet.`);
     calculate();
   }
   async function loadStock(query){
@@ -507,6 +536,30 @@
       return [];
     }
   }
+  function renderCatalog(items){
+    stockCatalog=[...items].sort((a,b)=>(a.name||a.symbol).localeCompare(b.name||b.symbol,'de'));
+    const grid=$('catalogGrid');grid.replaceChildren();
+    stockCatalog.forEach(item=>{
+      const button=document.createElement('button');button.type='button';button.className='catalogStock';
+      const name=document.createElement('span');name.className='catalogStockName';name.textContent=item.name||item.symbol;
+      const symbol=document.createElement('span');symbol.className='catalogStockSymbol';symbol.textContent=item.symbol;
+      button.append(name,symbol);button.addEventListener('click',()=>{
+        selectedSymbol=item.symbol;$('stockQuery').value=`${item.name||item.symbol} (${item.symbol})`;
+        $('stockCatalog').hidden=true;$('catalogToggle').setAttribute('aria-expanded','false');$('catalogToggle').textContent='Alle 87 Aktien anzeigen';
+        loadStock(item.symbol);
+      });
+      grid.appendChild(button);
+    });
+  }
+  async function loadCatalog(){
+    try{
+      const response=await fetch('/api/stocks',{headers:{Accept:'application/json'}});const data=await response.json();
+      if(!response.ok||!Array.isArray(data.stocks))throw new Error('CATALOG_ERROR');
+      renderCatalog(data.stocks);
+    }catch{
+      $('catalogGrid').innerHTML='<div class="suggestionEmpty">Die Aktienliste konnte noch nicht geladen werden.</div>';
+    }
+  }
   async function resolveAndLoad(query){
     if(selectedSymbol){loadStock(selectedSymbol);return;}
     if(/^[A-Za-z0-9.-]{1,15}$/.test(query)&&query===query.toUpperCase()){loadStock(query);return;}
@@ -533,14 +586,19 @@
     else if(event.key==='Escape')closeSuggestions();
   });
   document.addEventListener('click',event=>{if(!event.target.closest('.searchInput'))closeSuggestions();});
+  $('catalogToggle').addEventListener('click',()=>{
+    const willOpen=$('stockCatalog').hidden;$('stockCatalog').hidden=!willOpen;
+    $('catalogToggle').setAttribute('aria-expanded',String(willOpen));$('catalogToggle').textContent=willOpen?'Aktienliste schließen':'Alle 87 Aktien anzeigen';
+  });
   $('calc').addEventListener('click',calculate);
   inputIds.forEach(id=>$(id).addEventListener('input',calculate));
   $('currency').addEventListener('change',()=>{setCurrency($('currency').value);calculate();});
   $('reset').addEventListener('click',()=>{
     Object.entries(defaults).forEach(([key,value])=>$(key).value=value);setCurrency('EUR');
     $('stockQuery').value='';selectedSymbol='';closeSuggestions();$('dataPanel').classList.remove('visible');$('manualDetails').open=true;
-    setStatus('','Manuelle Beispielwerte wiederhergestellt','Du kannst alle Werte frei verändern oder oben eine Aktie automatisch laden.');calculate();
+    setStatus('','Eingabefelder geleert','Du kannst eine Aktie automatisch laden oder alle Werte selbst eintragen.');calculate();
   });
+  loadCatalog();
   calculate();
 })();
 </script>
