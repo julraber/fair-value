@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <title>Aktien Fair-Value-Rechner</title>
+  <style>
+    :root{
+      --bg:#08111f; --panel:#101b2d; --panel2:#0c1626; --text:#eef4ff; --muted:#9fb0c9;
+      --line:#263752; --accent:#65a8ff; --good:#32d583; --good2:#12b76a; --warn:#fdb022;
+      --bad:#f97066; --neutral:#94a3b8; --shadow:0 18px 60px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    html{color-scheme:dark}
+    body{
+      margin:0; min-height:100vh; color:var(--text);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:
+        radial-gradient(circle at 15% 0%, rgba(101,168,255,.16), transparent 30rem),
+        radial-gradient(circle at 90% 10%, rgba(50,213,131,.10), transparent 28rem),
+        var(--bg);
+    }
+    .wrap{width:min(1080px,calc(100% - 28px));margin:0 auto;padding:34px 0 50px}
+    header{margin-bottom:24px}
+    .eyebrow{font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+    h1{font-size:clamp(2rem,5vw,3.6rem);line-height:1.03;margin:.35rem 0 .65rem;letter-spacing:-.045em}
+    .lead{max-width:760px;color:var(--muted);font-size:1.02rem;line-height:1.6;margin:0}
+    .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,.9fr);gap:20px;align-items:start}
+    .card{
+      background:linear-gradient(180deg,rgba(16,27,45,.97),rgba(12,22,38,.97));
+      border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);overflow:hidden
+    }
+    .pad{padding:22px}
+    .card h2{font-size:1.05rem;margin:0 0 18px}
+    .fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    label{display:block;color:#dce7f8;font-size:.88rem;font-weight:700;margin:0 0 7px}
+    .hint{display:block;color:var(--muted);font-size:.75rem;font-weight:500;margin-top:4px;line-height:1.35}
+    .input{position:relative}
+    input,select{
+      width:100%;border:1px solid #324663;background:#091422;color:var(--text);border-radius:13px;
+      padding:13px 44px 13px 13px;font:inherit;font-weight:700;outline:none;transition:.2s
+    }
+    input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(101,168,255,.14)}
+    .suffix{position:absolute;right:13px;bottom:13px;color:var(--muted);font-size:.82rem;pointer-events:none}
+    .actions{display:flex;gap:10px;margin-top:18px}
+    button{
+      appearance:none;border:0;border-radius:13px;padding:13px 16px;font:inherit;font-weight:800;cursor:pointer
+    }
+    .primary{flex:1;background:var(--accent);color:#07111f}
+    .secondary{background:#1a2a42;color:#dce7f8;border:1px solid #314766}
+    .resultTop{padding:22px;border-bottom:1px solid var(--line)}
+    .resultLabel{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+    .fair{font-size:clamp(2.5rem,7vw,4.6rem);font-weight:900;letter-spacing:-.055em;margin:3px 0}
+    .small{color:var(--muted);font-size:.86rem}
+    .signal{margin:18px 22px 0;padding:16px;border-radius:16px;border:1px solid transparent}
+    .signal strong{display:block;font-size:1.08rem;margin-bottom:4px}
+    .signal span{font-size:.88rem;line-height:1.45}
+    .signal.bad{background:rgba(249,112,102,.10);border-color:rgba(249,112,102,.35);color:#ffd3cf}
+    .signal.neutral{background:rgba(148,163,184,.10);border-color:rgba(148,163,184,.28);color:#e1e8f0}
+    .signal.watch{background:rgba(253,176,34,.10);border-color:rgba(253,176,34,.35);color:#ffe4a3}
+    .signal.good{background:rgba(50,213,131,.11);border-color:rgba(50,213,131,.35);color:#c4f7dc}
+    .signal.strong{background:rgba(18,183,106,.18);border-color:rgba(50,213,131,.58);color:#c4f7dc;box-shadow:0 0 30px rgba(18,183,106,.08)}
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin:18px 22px 22px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+    .stat{background:var(--panel2);padding:14px}
+    .stat .k{color:var(--muted);font-size:.73rem;margin-bottom:4px}
+    .stat .v{font-weight:850;font-size:1.05rem}
+    .formula{margin-top:20px;padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:rgba(8,17,31,.5)}
+    .formula h3{margin:0 0 8px;font-size:.95rem}
+    .formula code{display:block;overflow:auto;color:#d9e7fb;font-size:.86rem;line-height:1.7;white-space:normal}
+    .formula p,.disclaimer{color:var(--muted);font-size:.79rem;line-height:1.55;margin:8px 0 0}
+    .barBox{margin:16px 22px 4px}
+    .barHead{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.76rem;margin-bottom:7px}
+    .bar{height:10px;background:#07101c;border-radius:99px;overflow:hidden;border:1px solid #263752}
+    .bar>div{height:100%;width:0%;background:linear-gradient(90deg,var(--warn),var(--good));transition:width .35s ease}
+    .scenarioGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+    .scenario{border:1px solid var(--line);border-radius:16px;padding:14px;background:#091422}
+    .scenario h3{margin:0 0 12px;font-size:.92rem}
+    .scenario .mini{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .scenario input{padding-right:35px}
+    .scenarioResult{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+    .scenarioResult b{font-size:1.2rem}
+    .scenarioResult span{display:block;color:var(--muted);font-size:.75rem;margin-top:3px}
+    .chartCard{margin-top:20px}
+    .chartWrap{padding:22px}
+    .chart{height:310px;display:flex;align-items:stretch;gap:clamp(18px,5vw,55px);padding:20px 12px 34px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);position:relative}
+    .chartGroup{flex:1;display:flex;justify-content:center;align-items:flex-end;gap:9px;position:relative;min-width:0}
+    .barCol{width:min(58px,42%);height:100%;display:flex;align-items:flex-end;position:relative}
+    .chartBar{width:100%;min-height:2px;border-radius:9px 9px 3px 3px;transition:height .35s ease;position:relative}
+    .chartBar.fairbar{background:linear-gradient(180deg,#65a8ff,#3478d4)}
+    .chartBar.marketbar{background:linear-gradient(180deg,#94a3b8,#64748b)}
+    .chartValue{position:absolute;left:50%;transform:translateX(-50%);top:-23px;font-size:.72rem;font-weight:800;white-space:nowrap}
+    .chartName{position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);font-size:.72rem;font-weight:750;white-space:nowrap}
+    .legend{display:flex;gap:18px;flex-wrap:wrap;margin:15px 0 0;color:var(--muted);font-size:.78rem}
+    .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+    .dot.fair{background:#65a8ff}.dot.market{background:#94a3b8}
+    footer{margin-top:18px;color:#7f91aa;font-size:.75rem;line-height:1.55;text-align:center}
+    @media(max-width:760px){
+      .wrap{width:min(100% - 20px,680px);padding-top:22px}
+      .grid{grid-template-columns:1fr}
+      .fields{grid-template-columns:1fr}
+      .scenarioGrid{grid-template-columns:1fr}
+      .chart{gap:10px;padding-left:5px;padding-right:5px}
+      .chartValue{font-size:.62rem}
+      .card{border-radius:18px}
+      .pad,.resultTop{padding:18px}
+      .signal,.stats,.barBox{margin-left:18px;margin-right:18px}
+      h1{font-size:2.25rem}
+    }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">Fundamentale Aktienbewertung</div>
+    <h1>Fair-Value-Rechner</h1>
+    <p class="lead">Berechnet den heutigen fairen Wert einer Aktie aus Gewinn je Aktie, erwartetem Gewinnwachstum, künftigem KGV und deiner Zielrendite – nach der im Video erläuterten vereinfachten 5‑Jahres-Methode.</p>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <div class="pad">
+        <h2>Eingaben</h2>
+        <div class="fields">
+          <div>
+            <label for="price">Aktueller Aktienkurs</label>
+            <div class="input"><input id="price" type="number" inputmode="decimal" step="0.01" min="0" value="139"><span class="suffix" id="cur1">€</span></div>
+            <span class="hint">Der aktuelle Marktpreis je Aktie.</span>
+          </div>
+          <div>
+            <label for="eps">Gewinn je Aktie (EPS)</label>
+            <div class="input"><input id="eps" type="number" inputmode="decimal" step="0.01" value="6.15"><span class="suffix" id="cur2">€</span></div>
+            <span class="hint">Gewinn je Aktie der letzten 12 Monate.</span>
+          </div>
+
+          <div>
+            <label for="return">Persönliche Zielrendite p. a.</label>
+            <div class="input"><input id="return" type="number" inputmode="decimal" step="0.1" value="12"><span class="suffix">%</span></div>
+            <span class="hint">Wird zum Abdiskontieren verwendet.</span>
+          </div>
+          <div>
+            <label for="years">Betrachtungszeitraum</label>
+            <div class="input"><input id="years" type="number" inputmode="numeric" step="1" min="1" max="30" value="5"><span class="suffix">Jahre</span></div>
+            <span class="hint">Im Video werden 5 Jahre verwendet.</span>
+          </div>
+          <div>
+            <label for="currency">Währung</label>
+            <select id="currency">
+              <option value="EUR" selected>EUR (€)</option>
+              <option value="USD">USD ($)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="CHF">CHF</option>
+            </select>
+          </div>
+        </div>
+        <div class="scenarioGrid">
+          <div class="scenario">
+            <h3>Konservativ</h3>
+            <div class="mini">
+              <div><label for="growthC">Wachstum</label><div class="input"><input id="growthC" type="number" step="0.1" value="6"><span class="suffix">%</span></div></div>
+              <div><label for="peC">KGV</label><div class="input"><input id="peC" type="number" step="0.1" value="18"><span class="suffix">×</span></div></div>
+            </div>
+            <div class="scenarioResult"><b id="fairC">–</b><span id="marginC">Fair Value</span></div>
+          </div>
+          <div class="scenario">
+            <h3>Realistisch</h3>
+            <div class="mini">
+              <div><label for="growthR">Wachstum</label><div class="input"><input id="growthR" type="number" step="0.1" value="10"><span class="suffix">%</span></div></div>
+              <div><label for="peR">KGV</label><div class="input"><input id="peR" type="number" step="0.1" value="23"><span class="suffix">×</span></div></div>
+            </div>
+            <div class="scenarioResult"><b id="fairR">–</b><span id="marginR">Fair Value</span></div>
+          </div>
+          <div class="scenario">
+            <h3>Optimistisch</h3>
+            <div class="mini">
+              <div><label for="growthO">Wachstum</label><div class="input"><input id="growthO" type="number" step="0.1" value="14"><span class="suffix">%</span></div></div>
+              <div><label for="peO">KGV</label><div class="input"><input id="peO" type="number" step="0.1" value="28"><span class="suffix">×</span></div></div>
+            </div>
+            <div class="scenarioResult"><b id="fairO">–</b><span id="marginO">Fair Value</span></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" id="calc">Fair Value berechnen</button>
+          <button class="secondary" id="reset" title="Beispielwerte wiederherstellen">↺</button>
+        </div>
+
+        <div class="formula">
+          <h3>Berechnung</h3>
+          <code>
+            Je Szenario: EPS Zukunft = EPS heute × (1 + Wachstum)<sup>Jahre</sup><br>
+            Zukunftskurs = EPS Zukunft × jeweiliges faires KGV<br>
+            Fair Value heute = Zukunftskurs ÷ (1 + Zielrendite)<sup>Jahre</sup>
+          </code>
+          <p>Die Unterbewertung wird als Abstand des aktuellen Kurses zum Fair Value berechnet: (Fair Value − aktueller Kurs) ÷ Fair Value.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="card" aria-live="polite">
+      <div class="resultTop">
+        <div class="resultLabel">Fair Value heute</div>
+        <div class="fair" id="fair">–</div>
+        <div class="small" id="comparison">Werte eingeben und berechnen.</div>
+      </div>
+
+      <div class="signal neutral" id="signal">
+        <strong id="signalTitle">Noch keine Bewertung</strong>
+        <span id="signalText">Der Rechner ordnet den aktuellen Kurs anhand der Sicherheitsmarge ein.</span>
+      </div>
+
+      <div class="barBox">
+        <div class="barHead"><span>Sicherheitsmarge</span><span id="marginLabel">–</span></div>
+        <div class="bar"><div id="barFill"></div></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">EPS in Zukunft</div><div class="v" id="futureEps">–</div></div>
+        <div class="stat"><div class="k">Kurs in Zukunft</div><div class="v" id="futurePrice">–</div></div>
+        <div class="stat"><div class="k">Abstand zum Fair Value</div><div class="v" id="diff">–</div></div>
+        <div class="stat"><div class="k">Bewertung</div><div class="v" id="valuation">–</div></div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="card chartCard">
+    <div class="chartWrap">
+      <h2 style="margin:0">Szenarien im Vergleich</h2>
+      <p class="small" style="margin-top:6px">Fair Value je Szenario im Vergleich zum aktuellen Marktpreis.</p>
+      <div class="chart" id="chart">
+        <div class="chartGroup"><div class="barCol"><div class="chartBar fairbar" id="barC"><span class="chartValue" id="valC"></span></div></div><span class="chartName">Konservativ</span></div>
+        <div class="chartGroup"><div class="barCol"><div class="chartBar fairbar" id="barR"><span class="chartValue" id="valR"></span></div></div><span class="chartName">Realistisch</span></div>
+        <div class="chartGroup"><div class="barCol"><div class="chartBar fairbar" id="barO"><span class="chartValue" id="valO"></span></div></div><span class="chartName">Optimistisch</span></div>
+        <div class="chartGroup"><div class="barCol"><div class="chartBar marketbar" id="barM"><span class="chartValue" id="valM"></span></div></div><span class="chartName">Marktpreis</span></div>
+      </div>
+      <div class="legend"><span><i class="dot fair"></i>Berechneter Fair Value</span><span><i class="dot market"></i>Aktueller Marktpreis</span></div>
+    </div>
+  </section>
+
+  <footer>
+    Hinweis: Dieses Tool bildet ein vereinfachtes Bewertungsmodell ab. Wachstumsrate, KGV und Zielrendite sind Annahmen; das Ergebnis ist keine Anlageberatung und keine Garantie für die künftige Kursentwicklung.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const inputIds = ['price','eps','return','years','growthC','peC','growthR','peR','growthO','peO'];
+  const symbols = {EUR:'€',USD:'$',GBP:'£',CHF:'CHF'};
+
+  function num(id){ return Number($(id).value); }
+  function money(v){
+    return new Intl.NumberFormat('de-DE',{style:'currency',currency:$('currency').value,maximumFractionDigits:2}).format(v);
+  }
+  function pct(v){ return new Intl.NumberFormat('de-DE',{maximumFractionDigits:1,minimumFractionDigits:1}).format(v)+' %'; }
+  function scenario(eps,growth,pe,target,years){
+    const futureEps=eps*Math.pow(1+growth/100,years);
+    const futurePrice=futureEps*pe;
+    const fair=futurePrice/Math.pow(1+target/100,years);
+    return {futureEps,futurePrice,fair};
+  }
+  function setSignal(cls,title,text){
+    $('signal').className='signal '+cls;$('signalTitle').textContent=title;$('signalText').textContent=text;
+  }
+  function calculate(){
+    const price=num('price'),eps=num('eps'),target=num('return'),years=num('years');
+    const vals=inputIds.map(num);
+    if(!vals.every(Number.isFinite)||price<=0||eps<=0||years<=0||target<=-100){
+      setSignal('bad','Eingaben prüfen','Bitte gültige Werte eingeben.'); return;
+    }
+    const C=scenario(eps,num('growthC'),num('peC'),target,years);
+    const R=scenario(eps,num('growthR'),num('peR'),target,years);
+    const O=scenario(eps,num('growthO'),num('peO'),target,years);
+    const all=[C,R,O];
+
+    [['C',C],['R',R],['O',O]].forEach(([k,s])=>{
+      const m=(s.fair-price)/s.fair*100;
+      $('fair'+k).textContent=money(s.fair);
+      $('margin'+k).textContent=(m>=0?pct(m)+' Sicherheitsmarge':pct(Math.abs(m))+' über Fair Value');
+    });
+
+    const fair=R.fair, margin=(fair-price)/fair*100, rel=(fair-price)/price*100;
+    $('fair').textContent=money(fair);
+    $('futureEps').textContent=money(R.futureEps);
+    $('futurePrice').textContent=money(R.futurePrice);
+    $('diff').textContent=(margin>=0?'+':'')+pct(margin);
+    $('valuation').textContent=margin>0?'unterbewertet':margin<0?'überbewertet':'fair bewertet';
+
+    if(margin<0){
+      $('comparison').textContent=`Der Marktpreis (${money(price)}) liegt ${pct(Math.abs(rel))} über dem realistischen Fair Value.`;
+      setSignal('bad','Nach realistischem Szenario: kein Kaufsignal','Der Marktpreis liegt über dem berechneten fairen Wert.');
+    }else if(margin<10){
+      $('comparison').textContent=`Der Marktpreis liegt ${pct(margin)} unter dem realistischen Fair Value.`;
+      setSignal('neutral','Nahe am Fair Value','Die Sicherheitsmarge liegt unter 10 %.');
+    }else if(margin<20){
+      $('comparison').textContent=`Der Marktpreis liegt ${pct(margin)} unter dem realistischen Fair Value.`;
+      setSignal('watch','Mindestens 10 % unter Fair Value','Moderat unterbewertet, aber noch keine 20-%-Sicherheitsmarge.');
+    }else if(margin<50){
+      $('comparison').textContent=`Der Marktpreis liegt ${pct(margin)} unter dem realistischen Fair Value.`;
+      setSignal('good','Kauf wird nach dem Modell empfohlen','Im realistischen Szenario beträgt die Sicherheitsmarge mindestens 20 %.');
+    }else{
+      $('comparison').textContent=`Der Marktpreis liegt ${pct(margin)} unter dem realistischen Fair Value.`;
+      setSignal('strong','Dringendes Kaufsignal nach dem Modell','Im realistischen Szenario beträgt die berechnete Sicherheitsmarge mindestens 50 %. Annahmen und Risiken besonders sorgfältig prüfen.');
+    }
+    $('marginLabel').textContent=margin>0?pct(margin):'0,0 %';
+    $('barFill').style.width=Math.max(0,Math.min(100,margin*2))+'%';
+
+    const max=Math.max(price,...all.map(x=>x.fair))*1.12;
+    [['C',C.fair],['R',R.fair],['O',O.fair],['M',price]].forEach(([k,v])=>{
+      $('bar'+k).style.height=Math.max(2,v/max*100)+'%';
+      $('val'+k).textContent=money(v);
+    });
+  }
+  $('calc').addEventListener('click',calculate);
+  inputIds.forEach(id=>$(id).addEventListener('input',calculate));
+  $('currency').addEventListener('change',()=>{
+    const s=symbols[$('currency').value];$('cur1').textContent=s;$('cur2').textContent=s;calculate();
+  });
+  $('reset').addEventListener('click',()=>{
+    const d={price:139,eps:6.15,return:12,years:5,growthC:6,peC:18,growthR:10,peR:23,growthO:14,peO:28};
+    Object.entries(d).forEach(([k,v])=>$(k).value=v);
+    $('currency').value='EUR';$('cur1').textContent='€';$('cur2').textContent='€';calculate();
+  });
+  calculate();
+})();
+</script>
+</body>
+</html>
