@@ -1,5 +1,6 @@
 const FMP_BASE_URL = "https://financialmodelingprep.com/stable";
 const CACHE_SECONDS = 6 * 60 * 60;
+const SEARCH_CACHE_SECONDS = 24 * 60 * 60;
 
 class ApiError extends Error {
   constructor(code, status = 502) {
@@ -14,6 +15,7 @@ function json(data, status = 200, extraHeaders = {}) {
     status,
     headers: {
       "Cache-Control": "no-store",
+      "Content-Type": "application/json; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
       ...extraHeaders
     }
@@ -149,9 +151,53 @@ function chooseSearchResult(results, query) {
 
   const usExchanges = new Set(["NASDAQ", "NYSE", "AMEX"]);
   return (
-    results.find(item => usExchanges.has(String(item.exchangeShortName || "").toUpperCase())) ||
+    results.find(item => usExchanges.has(String(item.exchangeShortName || item.exchange || "").toUpperCase())) ||
     results[0]
   );
+}
+
+function normalizeSearchResults(results, query) {
+  if (!Array.isArray(results)) return [];
+  const normalizedQuery = query.trim().toUpperCase();
+  const preferredExchanges = new Set(["NASDAQ", "NYSE", "AMEX"]);
+  const seen = new Set();
+
+  return results
+    .filter(item => item && item.symbol && (item.name || item.companyName))
+    .map(item => ({
+      symbol: String(item.symbol).toUpperCase(),
+      name: String(item.name || item.companyName || item.symbol),
+      exchange: String(item.exchangeShortName || item.stockExchange || "").toUpperCase()
+    }))
+    .filter(item => {
+      if (seen.has(item.symbol)) return false;
+      seen.add(item.symbol);
+      return true;
+    })
+    .sort((a, b) => {
+      const score = item => {
+        const symbol = item.symbol.toUpperCase();
+        const name = item.name.toUpperCase();
+        if (symbol === normalizedQuery) return 0;
+        if (name === normalizedQuery) return 1;
+        if (symbol.startsWith(normalizedQuery)) return 2;
+        if (name.startsWith(normalizedQuery)) return 3;
+        if (preferredExchanges.has(item.exchange)) return 4;
+        return 5;
+      };
+      return score(a) - score(b) || a.name.localeCompare(b.name);
+    })
+    .slice(0, 10);
+}
+
+async function searchStocks(query, apiKey) {
+  const rows = await fmpFetch(
+    "/search-name",
+    { query: query.trim(), limit: 25 },
+    apiKey,
+    "SEARCH"
+  );
+  return normalizeSearchResults(rows, query);
 }
 
 function buildPeBand(historicalRatios, currentPe) {
@@ -275,12 +321,7 @@ async function getStockData(query, apiKey) {
   if (looksLikeTicker) {
     symbol = normalizedQuery.toUpperCase();
   } else {
-    const searchRows = await fmpFetch(
-      "/search-name",
-      { query: normalizedQuery, limit: 10 },
-      apiKey,
-      "SEARCH"
-    );
+    const searchRows = await searchStocks(normalizedQuery, apiKey);
     const result = chooseSearchResult(searchRows, normalizedQuery);
     if (!result?.symbol) throw new ApiError("NOT_FOUND", 404);
     symbol = String(result.symbol).toUpperCase();
@@ -338,9 +379,39 @@ export default {
     if (url.pathname === "/api/health") {
       return json({
         ok: true,
-        workerVersion: "5",
+        workerVersion: "6",
         fmpConfigured: Boolean(env.FMP_API_KEY)
       });
+    }
+
+    if (url.pathname === "/api/search") {
+      if (request.method !== "GET") {
+        return json({ ok: false, code: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
+      }
+      if (!env.FMP_API_KEY) {
+        return json({ ok: false, code: "API_KEY_MISSING", error: "Der FMP-API-Schlüssel ist noch nicht konfiguriert." }, 500);
+      }
+
+      const query = (url.searchParams.get("q") || "").trim().slice(0, 80);
+      if (!query) return publicError(new ApiError("MISSING_QUERY", 400));
+
+      const cache = caches.default;
+      const cacheKeyUrl = new URL(url);
+      cacheKeyUrl.searchParams.set("q", query.toLowerCase());
+      const cacheKey = new Request(cacheKeyUrl.toString(), { method: "GET" });
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+
+      try {
+        const results = await searchStocks(query, env.FMP_API_KEY);
+        const response = json({ ok: true, results }, 200, {
+          "Cache-Control": `public, max-age=${SEARCH_CACHE_SECONDS}`
+        });
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return publicError(error);
+      }
     }
 
     if (url.pathname === "/api/stock") {

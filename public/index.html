@@ -10,6 +10,7 @@
       --bg:#10090c;--panel:#1c1015;--panel2:#211318;--input:#160d11;
       --text:#f5efec;--muted:#b8aaa7;--line:#493237;--burgundy:#8f2947;
       --burgundy-light:#c05a78;--pine:#285c45;--pine-light:#56a17c;
+      --realistic:#315f86;--realistic-light:#70a9d2;
       --accent:var(--burgundy-light);--good:#56a17c;
       --good2:#285c45;--warn:#d0a04a;--bad:#d46d78;--neutral:#9f918e;
       --shadow:0 18px 60px rgba(0,0,0,.32)
@@ -36,13 +37,26 @@
     }
     .pad{padding:22px}
     .card h2{font-size:1.05rem;margin:0}
-    .searchCard{margin-bottom:20px}
+    .searchCard{position:relative;z-index:5;margin-bottom:20px;overflow:visible}
     .searchHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px}
     .sectionText{color:var(--muted);font-size:.84rem;line-height:1.5;margin:5px 0 0}
     .searchRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
     .searchInput{position:relative}
     .searchInput svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:19px;height:19px;color:#aa8e95;pointer-events:none}
     .searchInput input{padding-left:44px;padding-right:14px;font-size:1rem}
+    .suggestions{
+      position:absolute;z-index:30;top:calc(100% + 7px);left:0;right:0;max-height:310px;overflow-y:auto;
+      border:1px solid #62444c;border-radius:14px;background:#1b1014;box-shadow:0 18px 46px rgba(0,0,0,.48);padding:6px
+    }
+    .suggestions[hidden]{display:none}
+    .suggestion{
+      width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;
+      padding:11px 12px;border-radius:10px;background:transparent;color:var(--text);font-weight:750
+    }
+    .suggestion:hover,.suggestion.active{background:rgba(192,90,120,.15);filter:none}
+    .suggestionName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .suggestionMeta{flex:0 0 auto;color:#d9c8c4;font-size:.78rem;font-weight:850}
+    .suggestionEmpty{padding:12px;color:var(--muted);font-size:.84rem}
     input,select{
       width:100%;min-width:0;border:1px solid #543a40;background:var(--input);color:var(--text);
       border-radius:13px;padding:13px 44px 13px 13px;font-weight:750;outline:none;transition:.2s
@@ -129,14 +143,14 @@
     .barCol{width:26px;height:100%;display:flex;align-items:flex-end;position:relative}
     .chartBar{width:100%;min-height:2px;border-radius:7px 7px 2px 2px;transition:height .35s ease;position:relative}
     #barC{background:linear-gradient(180deg,var(--burgundy-light),var(--burgundy))}
-    #barR{background:linear-gradient(180deg,#b34766,var(--burgundy))}
+    #barR{background:linear-gradient(180deg,var(--realistic-light),var(--realistic))}
     #barO{background:linear-gradient(180deg,var(--pine-light),var(--pine))}
     .chartBar.marketbar{background:linear-gradient(180deg,#a89995,#746763)}
     .chartValue{position:absolute;left:50%;transform:translateX(-50%);top:-21px;font-size:.64rem;font-weight:850;white-space:nowrap}
     .chartName{position:absolute;bottom:-27px;left:50%;transform:translateX(-50%);font-size:.62rem;font-weight:750;white-space:nowrap}
     .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 0;color:var(--muted);font-size:.73rem}
     .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
-    .dot.fair{background:var(--burgundy-light)}.dot.market{background:var(--neutral)}
+    .dot.conservative{background:var(--burgundy-light)}.dot.realistic{background:var(--realistic-light)}.dot.optimistic{background:var(--pine-light)}.dot.market{background:var(--neutral)}
     footer{margin-top:18px;color:#978683;font-size:.75rem;line-height:1.55;text-align:center}
     @media(max-width:900px){
       .grid{grid-template-columns:1fr}
@@ -178,7 +192,8 @@
       <form class="searchRow" id="stockForm">
         <div class="searchInput">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.8-3.8"></path></svg>
-          <input id="stockQuery" type="search" autocomplete="off" placeholder="Apple oder AAPL" aria-label="Aktie suchen">
+          <input id="stockQuery" type="search" autocomplete="off" placeholder="Apple oder AAPL" aria-label="Aktie suchen" aria-autocomplete="list" aria-controls="stockSuggestions" aria-expanded="false">
+          <div class="suggestions" id="stockSuggestions" role="listbox" hidden></div>
         </div>
         <button class="primary" id="loadStock" type="submit">Daten laden</button>
       </form>
@@ -297,7 +312,7 @@
           <div class="chartGroup"><div class="barCol"><div class="chartBar" id="barO"><span class="chartValue" id="valO"></span></div></div><span class="chartName">Optimistisch</span></div>
           <div class="chartGroup"><div class="barCol"><div class="chartBar marketbar" id="barM"><span class="chartValue" id="valM"></span></div></div><span class="chartName">Marktpreis</span></div>
         </div>
-        <div class="legend"><span><i class="dot fair"></i>Fair Values</span><span><i class="dot market"></i>Marktpreis</span></div>
+        <div class="legend"><span><i class="dot conservative"></i>Konservativ</span><span><i class="dot realistic"></i>Realistisch</span><span><i class="dot optimistic"></i>Optimistisch</span><span><i class="dot market"></i>Marktpreis</span></div>
       </div>
     </aside>
   </section>
@@ -311,6 +326,12 @@
   const inputIds = ['price','eps','return','years','growthC','peC','growthR','peR','growthO','peO'];
   const symbols = {EUR:'€',USD:'$',GBP:'£',CHF:'CHF'};
   const defaults = {price:139,eps:6.15,return:12,years:5,growthC:6,peC:18,growthR:10,peR:23,growthO:14,peO:28};
+  const searchMemo=new Map();
+  let selectedSymbol='';
+  let suggestions=[];
+  let activeSuggestion=-1;
+  let searchTimer;
+  let searchRequest=0;
 
   function num(id){ return Number($(id).value); }
   function setNumber(id,value){ if(Number.isFinite(Number(value))) $(id).value=Number(value).toFixed(2).replace(/\.00$/,''); }
@@ -405,6 +426,7 @@
     calculate();
   }
   async function loadStock(query){
+    closeSuggestions();
     $('loadStock').disabled=true;setStatus('loading','Finanzdaten werden geladen','Kurs, EPS, historische KGV-Werte und Analystenschätzungen werden abgerufen.');
     try{
       const response=await fetch('/api/stock?q='+encodeURIComponent(query),{headers:{Accept:'application/json'}});
@@ -436,17 +458,87 @@
     }finally{$('loadStock').disabled=false;}
   }
 
+  function closeSuggestions(){
+    suggestions=[];activeSuggestion=-1;$('stockSuggestions').hidden=true;$('stockQuery').setAttribute('aria-expanded','false');
+  }
+  function renderSuggestions(items){
+    suggestions=items;activeSuggestion=-1;
+    const box=$('stockSuggestions');box.replaceChildren();
+    if(!items.length){
+      const empty=document.createElement('div');empty.className='suggestionEmpty';empty.textContent='Keine passenden Aktien gefunden.';box.appendChild(empty);
+    }else{
+      items.forEach((item,index)=>{
+        const button=document.createElement('button');button.type='button';button.className='suggestion';button.setAttribute('role','option');button.dataset.index=String(index);
+        const name=document.createElement('span');name.className='suggestionName';name.textContent=item.name||item.symbol;
+        const meta=document.createElement('span');meta.className='suggestionMeta';meta.textContent=[item.symbol,item.exchange].filter(Boolean).join(' · ');
+        button.append(name,meta);
+        button.addEventListener('mousedown',event=>event.preventDefault());
+        button.addEventListener('click',()=>chooseSuggestion(index));
+        box.appendChild(button);
+      });
+    }
+    box.hidden=false;$('stockQuery').setAttribute('aria-expanded','true');
+  }
+  function markActiveSuggestion(index){
+    if(!suggestions.length)return;
+    activeSuggestion=(index+suggestions.length)%suggestions.length;
+    [...$('stockSuggestions').querySelectorAll('.suggestion')].forEach((button,i)=>{
+      const active=i===activeSuggestion;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));
+      if(active)button.scrollIntoView({block:'nearest'});
+    });
+  }
+  function chooseSuggestion(index){
+    const item=suggestions[index];if(!item)return;
+    selectedSymbol=item.symbol;$('stockQuery').value=`${item.name||item.symbol} (${item.symbol})`;closeSuggestions();loadStock(item.symbol);
+  }
+  async function searchStocks(query){
+    const normalized=query.trim().toLowerCase();if(!normalized){closeSuggestions();return [];}
+    if(searchMemo.has(normalized)){renderSuggestions(searchMemo.get(normalized));return searchMemo.get(normalized);}
+    const requestId=++searchRequest;
+    try{
+      const response=await fetch('/api/search?q='+encodeURIComponent(query),{headers:{Accept:'application/json'}});
+      const data=await response.json();
+      if(!response.ok||data.ok===false)throw new Error(data.code||'SEARCH_ERROR');
+      const items=Array.isArray(data.results)?data.results:[];searchMemo.set(normalized,items);
+      if(requestId===searchRequest&&$('stockQuery').value.trim().toLowerCase()===normalized)renderSuggestions(items);
+      return items;
+    }catch{
+      if(requestId===searchRequest)closeSuggestions();
+      return [];
+    }
+  }
+  async function resolveAndLoad(query){
+    if(selectedSymbol){loadStock(selectedSymbol);return;}
+    if(/^[A-Za-z0-9.-]{1,15}$/.test(query)&&query===query.toUpperCase()){loadStock(query);return;}
+    const items=await searchStocks(query);
+    if(items[0]){
+      selectedSymbol=items[0].symbol;$('stockQuery').value=`${items[0].name||items[0].symbol} (${items[0].symbol})`;loadStock(items[0].symbol);
+    }else loadStock(query);
+  }
+
   $('stockForm').addEventListener('submit',event=>{
     event.preventDefault();const query=$('stockQuery').value.trim();
     if(!query){manualFallback('Bitte eine Aktie eingeben','Nutze den Unternehmensnamen oder das Börsenkürzel, zum Beispiel Apple oder AAPL.');$('stockQuery').focus();return;}
-    loadStock(query);
+    if(activeSuggestion>=0&&suggestions[activeSuggestion]){chooseSuggestion(activeSuggestion);return;}
+    resolveAndLoad(query);
   });
+  $('stockQuery').addEventListener('input',event=>{
+    selectedSymbol='';clearTimeout(searchTimer);const query=event.target.value.trim();
+    if(!query){closeSuggestions();return;}
+    searchTimer=setTimeout(()=>searchStocks(query),350);
+  });
+  $('stockQuery').addEventListener('keydown',event=>{
+    if(event.key==='ArrowDown'){event.preventDefault();markActiveSuggestion(activeSuggestion+1);}
+    else if(event.key==='ArrowUp'){event.preventDefault();markActiveSuggestion(activeSuggestion-1);}
+    else if(event.key==='Escape')closeSuggestions();
+  });
+  document.addEventListener('click',event=>{if(!event.target.closest('.searchInput'))closeSuggestions();});
   $('calc').addEventListener('click',calculate);
   inputIds.forEach(id=>$(id).addEventListener('input',calculate));
   $('currency').addEventListener('change',()=>{setCurrency($('currency').value);calculate();});
   $('reset').addEventListener('click',()=>{
     Object.entries(defaults).forEach(([key,value])=>$(key).value=value);setCurrency('EUR');
-    $('stockQuery').value='';$('dataPanel').classList.remove('visible');$('manualDetails').open=true;
+    $('stockQuery').value='';selectedSymbol='';closeSuggestions();$('dataPanel').classList.remove('visible');$('manualDetails').open=true;
     setStatus('','Manuelle Beispielwerte wiederhergestellt','Du kannst alle Werte frei verändern oder oben eine Aktie automatisch laden.');calculate();
   });
   calculate();
